@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Paper Assistant AIDA</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Tahoma, Arial, sans-serif;
+    background: #f5f3ff;
+    color: #25213b;
+    direction: rtl;
+}
+
+header {
+    background: linear-gradient(135deg, #6c4bd8, #9276ed);
+    color: white;
+    padding: 35px 20px;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0 0 12px;
+    font-size: 25px;
+}
+
+header p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.container {
+    max-width: 750px;
+    margin: 30px auto;
+    padding: 15px;
+}
+
+.card {
+    background: white;
+    border-radius: 18px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+}
+
+h2 {
+    font-size: 19px;
+    margin-top: 0;
+}
+
+.upload {
+    border: 2px dashed #a18be9;
+    border-radius: 15px;
+    padding: 30px 15px;
+    text-align: center;
+    background: #faf9ff;
+}
+
+.upload input {
+    max-width: 100%;
+    margin-top: 15px;
+}
+
+button {
+    border: none;
+    border-radius: 10px;
+    padding: 14px 22px;
+    background: #7658df;
+    color: white;
+    font-size: 15px;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 15px;
+}
+
+button:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+#status {
+    margin-top: 18px;
+    font-size: 14px;
+    line-height: 2;
+}
+
+#result {
+    white-space: pre-wrap;
+    direction: rtl;
+    text-align: right;
+    line-height: 2;
+    overflow-wrap: anywhere;
+    font-size: 14px;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    color: #888;
+    font-size: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>AI Paper Assistant AIDA</h1>
+    <p>دستیار هوشمند تحلیل مقالات علمی</p>
+</header>
+
+<div class="container">
+
+    <div class="card">
+        <h2>📚 تحلیل مقاله علمی</h2>
+        <p>
+            فایل PDF مقاله خود را انتخاب کنید تا متن آن استخراج شود.
+        </p>
+
+        <div class="upload">
+            <p>📄 فایل مقاله خود را اینجا انتخاب کنید</p>
+            <input
+                type="file"
+                id="pdfFile"
+                accept=".pdf,application/pdf"
+            >
+        </div>
+
+        <button id="extractBtn" onclick="extractPDF()" disabled>
+            استخراج متن مقاله
+        </button>
+
+        <div id="status"></div>
+    </div>
+
+    <div class="card">
+        <h2>📝 متن استخراج‌شده مقاله</h2>
+        <div id="result">
+            هنوز فایلی انتخاب نشده است.
+        </div>
+    </div>
+
+</div>
+
+<footer>
+    AI Paper Assistant AIDA | نسخه اولیه
+</footer>
+
+<script>
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const fileInput = document.getElementById('pdfFile');
+const extractBtn = document.getElementById('extractBtn');
+
+fileInput.addEventListener('change', function() {
+    extractBtn.disabled = !fileInput.files.length;
+
+    if (fileInput.files.length) {
+        document.getElementById('status').textContent =
+        'فایل انتخاب شد: ' + fileInput.files[0].name;
+    }
+});
+
+async function extractPDF() {
+
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert('لطفاً ابتدا یک فایل PDF انتخاب کنید.');
+        return;
+    }
+
+    extractBtn.disabled = true;
+
+    const status = document.getElementById('status');
+    const result = document.getElementById('result');
+
+    status.textContent = '⏳ در حال استخراج متن مقاله...';
+    result.textContent = '';
+
+    try {
+
+        const arrayBuffer = await file.arrayBuffer();
+
+        const pdf = await pdfjsLib.getDocument({
+            data: arrayBuffer
+        }).promise;
+
+        let fullText = '';
+
+        for (let pageNumber = 1;
+             pageNumber <= pdf.numPages;
+             pageNumber++) {
+
+            status.textContent =
+            'در حال خواندن صفحه ' + pageNumber +
+            ' از ' + pdf.numPages;
+
+            const page = await pdf.getPage(pageNumber);
+
+            const content = await page.getTextContent();
+
+            const pageText = content.items
+                .map(item => item.str)
+                .join(' ');
+
+            fullText +=
+            '\n\n--- صفحه ' + pageNumber + ' ---\n\n' +
+            pageText;
+        }
+
+        if (!fullText.trim()) {
+            result.textContent =
+            'متنی از این PDF استخراج نشد. ممکن است مقاله اسکن‌شده باشد.';
+            status.textContent = 'استخراج متن کامل نشد.';
+        } else {
+
+            result.textContent = fullText;
+
+            status.textContent =
+            '✅ متن مقاله با موفقیت استخراج شد. تعداد صفحات: ' +
+            pdf.numPages;
+        }
+
+    } catch (error) {
+
+        status.textContent =
+        '❌ خطا در خواندن PDF. لطفاً فایل دیگری امتحان کنید.';
+
+        result.textContent = error.message;
+
+    }
+
+    extractBtn.disabled = false;
+}
+
+</script>
+
+</body>
+</html>
